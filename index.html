@@ -992,6 +992,13 @@
             const card = cardCollection.find(c => c.id === cardId);
             if (!card) return;
 
+            // QRCodeライブラリの非同期読み込み安全処理を追加
+            if (typeof QRCode === 'undefined') {
+                container.innerHTML = '<div class="text-xs text-neutral-500 font-mono">ライブラリを読み込み中...</div>';
+                setTimeout(generateTradeQRCode, 300);
+                return;
+            }
+
             const payload = JSON.stringify({
                 id: card.id,
                 title: card.title,
@@ -1027,7 +1034,7 @@
                 requestAnimationFrame(scanQRCodeTick);
                 status.innerText = "QRコードを枠内にかざしてください";
             } catch (err) {
-                status.innerText = "⚠️ カメラの起動に失敗しました";
+                status.innerText = "⚠️ カメラの起動に失敗しました（HTTPS環境が必要です）";
             }
         }
 
@@ -1044,18 +1051,21 @@
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert",
-                });
+                
+                if (typeof jsQR !== 'undefined') {
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
 
-                if (code) {
-                    try {
-                        const data = JSON.parse(code.data);
-                        if (data.id && data.title && data.seed) {
-                            receiveCardData(data);
-                            return;
-                        }
-                    } catch (e) {}
+                    if (code) {
+                        try {
+                            const data = JSON.parse(code.data);
+                            if (data.id && data.title && data.seed !== undefined) {
+                                receiveCardData(data);
+                                return;
+                            }
+                        } catch (e) {}
+                    }
                 }
             }
             requestAnimationFrame(scanQRCodeTick);
