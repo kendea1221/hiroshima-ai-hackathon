@@ -8,7 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Google Fonts: JetBrains Mono & Inter -->
+    <!-- QRコード生成ライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- QRコード読み取りライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
@@ -19,16 +23,6 @@
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
-                    },
-                    colors: {
-                        vercel: {
-                            bg: '#000000',
-                            card: '#0a0a0a',
-                            border: '#262626',
-                            hover: '#171717',
-                            subtle: '#888888',
-                            accent: '#ffffff',
-                        }
                     }
                 }
             }
@@ -42,31 +36,69 @@
             overflow-x: hidden;
             touch-action: manipulation;
         }
-        .font-mono {
-            font-family: 'JetBrains Mono', monospace;
-        }
-        ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #000000;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #262626;
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #404040;
-        }
         .pixelated {
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
-        .vercel-glass {
-            background: rgba(10, 10, 10, 0.85);
-            backdrop-filter: blur(12px);
-            border: 1px solid #262626;
+
+        /* Smash Animation Classes */
+        @keyframes shake {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-10px, 8px) rotate(-3deg); }
+            40% { transform: translate(10px, -8px) rotate(3deg); }
+            60% { transform: translate(-8px, -5px) rotate(-2deg); }
+            80% { transform: translate(8px, 5px) rotate(2deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .animate-shake {
+            animation: shake 0.25s ease-in-out infinite;
+        }
+
+        @keyframes attack-left {
+            0% { transform: translateX(0) scale(1); }
+            40% { transform: translateX(-30px) scale(0.95); }
+            70% { transform: translateX(180px) scale(1.25); }
+            100% { transform: translateX(0) scale(1); }
+        }
+        .animate-attack-left {
+            animation: attack-left 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes attack-right {
+            0% { transform: translateX(0) scale(1); }
+            40% { transform: translateX(30px) scale(0.95); }
+            70% { transform: translateX(-180px) scale(1.25); }
+            100% { transform: translateX(0) scale(1); }
+        }
+        .animate-attack-right {
+            animation: attack-right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes blast-off-right {
+            0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+            20% { transform: translate(-20px, 10px) rotate(-15deg) scale(1.1); filter: brightness(3); }
+            100% { transform: translate(1000px, -600px) rotate(1080deg) scale(0.1); opacity: 0; }
+        }
+        .animate-blast-right {
+            animation: blast-off-right 0.7s ease-in forwards;
+        }
+
+        @keyframes blast-off-left {
+            0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+            20% { transform: translate(20px, 10px) rotate(15deg) scale(1.1); filter: brightness(3); }
+            100% { transform: translate(-1000px, -600px) rotate(-1080deg) scale(0.1); opacity: 0; }
+        }
+        .animate-blast-left {
+            animation: blast-off-left 0.7s ease-in forwards;
+        }
+
+        @keyframes smash-hit-flash {
+            0% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; transform: scale(1.4); }
+            100% { opacity: 0; transform: scale(2); }
+        }
+        .smash-flash {
+            animation: smash-hit-flash 0.3s ease-out forwards;
         }
     </style>
 </head>
@@ -86,12 +118,18 @@
             </div>
 
             <!-- View Switcher -->
-            <div class="flex items-center gap-2 bg-neutral-900/80 p-1 border border-neutral-800 rounded-lg">
-                <button id="nav-gen-btn" onclick="switchTab('generator')" class="px-3 py-1.5 text-xs font-mono rounded transition-all bg-white text-black font-semibold shadow-sm">
-                    ⚡ 生成エンジン
+            <div class="flex items-center gap-1 sm:gap-2 bg-neutral-900/80 p-1 border border-neutral-800 rounded-lg">
+                <button id="nav-gen-btn" onclick="switchTab('generator')" class="px-2.5 sm:px-3 py-1.5 text-xs font-mono rounded transition-all bg-white text-black font-semibold shadow-sm">
+                    ⚡ 生成
                 </button>
-                <button id="nav-museum-btn" onclick="switchTab('museum')" class="px-3 py-1.5 text-xs font-mono text-neutral-400 hover:text-white rounded transition-all">
+                <button id="nav-battle-btn" onclick="switchTab('battle')" class="px-2.5 sm:px-3 py-1.5 text-xs font-mono text-neutral-400 hover:text-white rounded transition-all">
+                    ⚔️ バトル
+                </button>
+                <button id="nav-museum-btn" onclick="switchTab('museum')" class="px-2.5 sm:px-3 py-1.5 text-xs font-mono text-neutral-400 hover:text-white rounded transition-all">
                     🏛️ 3D美術館
+                </button>
+                <button onclick="openTradeModal()" class="px-2.5 sm:px-3 py-1.5 text-xs font-mono text-neutral-400 hover:text-white rounded transition-all border border-neutral-700 hover:border-white">
+                    🔄 交換
                 </button>
             </div>
 
@@ -101,9 +139,9 @@
                     <span>所持カード:</span>
                     <span id="header-card-count" class="text-white font-bold">0</span>
                 </div>
-                <button onclick="confirmResetDB()" title="データベースをリセットして保存されたカードを消去" class="px-3 py-1.5 text-xs font-mono text-red-400 border border-red-950 hover:border-red-600/50 hover:bg-red-950/30 rounded transition-all flex items-center gap-1.5">
+                <button onclick="confirmResetDB()" title="データベースをリセット" class="px-3 py-1.5 text-xs font-mono text-red-400 border border-red-950 hover:border-red-600/50 hover:bg-red-950/30 rounded transition-all flex items-center gap-1.5">
                     <span>🗑️</span>
-                    <span class="hidden sm:inline">DBリセット</span>
+                    <span class="hidden sm:inline">リセット</span>
                 </button>
             </div>
         </div>
@@ -169,16 +207,13 @@
                 </div>
             </div>
 
-            <!-- Live Preview Stage & Card Grid -->
+            <!-- Preview & Grid -->
             <div class="flex-1 flex flex-col gap-6">
-                
-                <!-- Main Preview Panel -->
                 <div class="p-6 border border-neutral-800 bg-neutral-950/60 rounded-xl flex flex-col items-center justify-center min-h-[440px] relative overflow-hidden">
                     <div class="absolute top-3 left-4 font-mono text-[11px] text-neutral-500 uppercase tracking-widest">
                         // キャラクター生成プレビュー
                     </div>
 
-                    <!-- Card Canvas Target Container -->
                     <div id="card-preview-container" class="my-4 transition-transform duration-300 hover:scale-[1.02]">
                         <div class="text-center text-neutral-600 font-mono text-xs py-16">
                             [ キャラクターが未生成です ]<br>
@@ -186,7 +221,6 @@
                         </div>
                     </div>
 
-                    <!-- Fortune & Diagnosis Bar -->
                     <div id="card-fortune-box" class="hidden max-w-sm w-full bg-black/80 border border-neutral-800 p-3 rounded text-center font-mono text-xs text-neutral-300 mb-3">
                         <div class="text-[10px] text-neutral-500 uppercase">夢診断メッセージ</div>
                         <div id="card-fortune-text" class="text-neutral-200 mt-1"></div>
@@ -207,33 +241,87 @@
                         </h3>
                     </div>
 
-                    <div id="collection-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                        <!-- Dynamic Card Thumbnails -->
+                    <div id="collection-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"></div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- BATTLE TAB -->
+        <section id="tab-battle" class="hidden flex-1 flex-col space-y-6">
+            <div id="battle-stage-container" class="relative w-full h-[460px] border border-neutral-800 rounded-xl bg-neutral-950 overflow-hidden flex flex-col justify-between p-6">
+                <div class="absolute inset-0 bg-[radial-gradient(#262626_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none"></div>
+
+                <div class="z-10 flex justify-between items-center font-mono text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                        <span class="text-neutral-400 uppercase tracking-widest font-bold">SMASH ARENA // DREAM BATTLE</span>
+                    </div>
+                    <div id="battle-status-text" class="text-amber-400 font-bold tracking-wider">対戦カードを選択してください</div>
+                </div>
+
+                <div id="smash-impact-effect" class="absolute inset-0 pointer-events-none z-30 flex items-center justify-center hidden">
+                    <div class="text-6xl sm:text-8xl font-black italic text-yellow-300 drop-shadow-[0_0_35px_rgba(255,230,0,0.9)] smash-flash font-mono">
+                        GAME!!
                     </div>
                 </div>
 
+                <div class="z-10 flex-1 flex items-center justify-around relative px-4">
+                    <div class="flex flex-col items-center gap-3 relative">
+                        <div id="p1-percent" class="font-mono font-black text-2xl text-red-500 tracking-wider">0%</div>
+                        <div id="p1-card-slot" class="w-[180px] h-[255px] border-2 border-dashed border-neutral-800 rounded-lg flex items-center justify-center text-center font-mono text-xs text-neutral-600 bg-black/50 transition-all">
+                            [ PLAYER 1 ]<br>カードを選択
+                        </div>
+                        <div id="p1-name" class="font-mono text-xs font-bold text-neutral-300 max-w-[180px] truncate text-center">-</div>
+                    </div>
+
+                    <div id="vs-emblem" class="font-mono font-black text-4xl italic text-neutral-700 tracking-tighter">
+                        VS
+                    </div>
+
+                    <div class="flex flex-col items-center gap-3 relative">
+                        <div id="p2-percent" class="font-mono font-black text-2xl text-blue-500 tracking-wider">0%</div>
+                        <div id="p2-card-slot" class="w-[180px] h-[255px] border-2 border-dashed border-neutral-800 rounded-lg flex items-center justify-center text-center font-mono text-xs text-neutral-600 bg-black/50 transition-all">
+                            [ PLAYER 2 ]<br>カードを選択
+                        </div>
+                        <div id="p2-name" class="font-mono text-xs font-bold text-neutral-300 max-w-[180px] truncate text-center">-</div>
+                    </div>
+                </div>
+
+                <div class="z-10 flex justify-center items-center gap-4">
+                    <button id="start-battle-btn" onclick="startSmashBattle()" disabled class="px-8 py-3 bg-neutral-800 text-neutral-500 font-mono font-bold text-sm rounded transition-all tracking-wider uppercase">
+                        ⚔️ 大乱闘開始！
+                    </button>
+                    <button onclick="resetBattleSelection()" class="px-4 py-3 border border-neutral-800 text-neutral-400 hover:text-white font-mono text-xs rounded transition-all">
+                        🔄 選択解除
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div class="flex justify-between items-center font-mono text-xs">
+                    <span class="text-neutral-400 font-bold uppercase tracking-wider">対戦に使用するカードを選択</span>
+                    <span class="text-neutral-500">保存済み: <span id="battle-selector-count">0</span>枚</span>
+                </div>
+                <div id="battle-card-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3"></div>
             </div>
         </section>
 
 
         <!-- 3D MUSEUM TAB -->
         <section id="tab-museum" class="hidden flex-1 flex-col space-y-4">
-            
             <div class="relative w-full h-[65vh] min-h-[450px] border border-neutral-800 rounded-xl overflow-hidden bg-black">
                 <div id="museum-3d-canvas-wrapper" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
 
-                <!-- 3D Instructions Overlay -->
                 <div class="absolute top-4 left-4 z-10 pointer-events-none bg-black/80 backdrop-blur border border-neutral-800 p-3 rounded-lg font-mono text-xs text-neutral-300 space-y-1">
                     <div class="text-white font-bold flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                         3D夢の展示回廊
                     </div>
                     <div class="text-[11px] text-neutral-400">WASD / 矢印キー : アバター移動</div>
-                    <div class="text-[11px] text-neutral-400">マウスドラッグ : 視点回転</div>
-                    <div class="text-[11px] text-neutral-400">絵画をクリック / [E]キー : 詳細の拡大表示</div>
+                    <div class="text-[11px] text-neutral-400">絵画をクリック / [E]キー : 詳細拡大</div>
                 </div>
 
-                <!-- Interactive Prompt Notification -->
                 <div id="museum-prompt-badge" class="hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-white text-black border border-white px-5 py-2.5 rounded-full font-mono text-xs font-bold shadow-2xl animate-bounce flex items-center gap-2">
                     <span>🔍</span> [E]キー または クリックで詳細を表示
                 </div>
@@ -244,9 +332,8 @@
                     <span>展示中のエンティティ:</span>
                     <span id="museum-count" class="text-white font-bold">0</span>
                 </div>
-                <div>絵画の近くに移動すると、3D空間上で夢のエンティティを鑑賞できます。</div>
+                <div>絵画の近くに移動すると鑑賞できます。</div>
             </div>
-
         </section>
 
     </main>
@@ -254,22 +341,52 @@
     <!-- Card Detail Modal -->
     <div id="detail-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-4">
         <div class="bg-neutral-950 border border-neutral-800 max-w-md w-full rounded-2xl p-6 relative flex flex-col items-center gap-4 shadow-2xl">
-            <button onclick="closeModal()" class="absolute top-4 right-4 text-neutral-400 hover:text-white font-mono text-sm p-1">
-                ✕ 閉じる (ESC)
-            </button>
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-neutral-400 hover:text-white font-mono text-sm p-1">✕ 閉じる</button>
             <div class="text-center font-mono text-xs text-neutral-500 uppercase tracking-widest border-b border-neutral-800 w-full pb-2">
                 展示カードインスペクター
             </div>
             <div id="modal-card-render" class="my-1"></div>
             <div id="modal-card-details" class="w-full text-center font-mono space-y-1"></div>
-            
             <div class="w-full flex gap-2">
                 <button id="download-btn" onclick="downloadCurrentModalCard()" class="flex-1 py-2.5 bg-neutral-800 text-white font-mono text-xs font-bold rounded hover:bg-neutral-700 transition-colors">
-                    📥 PNGダウンロード
+                    📥 PNG保存
                 </button>
                 <button onclick="closeModal()" class="flex-1 py-2.5 bg-white text-black font-mono text-xs font-bold rounded hover:bg-neutral-200 transition-colors">
                     閉じる
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trade Modal (QR) -->
+    <div id="trade-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="bg-neutral-950 border border-neutral-800 max-w-md w-full rounded-2xl p-6 relative flex flex-col items-center gap-4 shadow-2xl">
+            <button onclick="closeTradeModal()" class="absolute top-4 right-4 text-neutral-400 hover:text-white font-mono text-sm p-1">✕ 閉じる</button>
+            <div class="text-center font-mono text-xs text-neutral-500 uppercase tracking-widest border-b border-neutral-800 w-full pb-2">
+                カードトレード (QRコード交換)
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="flex gap-2 w-full font-mono text-xs">
+                <button id="trade-tab-send-btn" onclick="switchTradeTab('send')" class="flex-1 py-2 bg-white text-black font-bold rounded">カードをあげる</button>
+                <button id="trade-tab-receive-btn" onclick="switchTradeTab('receive')" class="flex-1 py-2 bg-neutral-800 text-neutral-400 rounded">カードをもらう</button>
+            </div>
+
+            <!-- Send Section -->
+            <div id="trade-send-section" class="w-full flex flex-col items-center gap-3">
+                <label class="text-xs font-mono text-neutral-400">送るカードを選択してください</label>
+                <select id="trade-card-select" onchange="generateTradeQRCode()" class="w-full bg-black border border-neutral-800 text-white p-2 rounded text-xs font-mono"></select>
+                <div id="qrcode-container" class="p-3 bg-white rounded-lg my-2 min-h-[160px] flex items-center justify-center"></div>
+            </div>
+
+            <!-- Receive Section -->
+            <div id="trade-receive-section" class="w-full flex flex-col items-center gap-3 hidden">
+                <div class="relative w-full h-48 bg-black rounded-lg overflow-hidden border border-neutral-800 flex items-center justify-center">
+                    <video id="trade-camera-stream" class="w-full h-full object-cover" playsinline></video>
+                    <canvas id="trade-camera-canvas" class="hidden"></canvas>
+                    <div class="absolute inset-0 border-2 border-dashed border-white/50 pointer-events-none"></div>
+                </div>
+                <div id="trade-scan-status" class="text-xs font-mono text-neutral-400">カメラを起動中...</div>
             </div>
         </div>
     </div>
@@ -285,6 +402,15 @@
         let selectedRarity = 'UR';
         let currentTab = 'generator';
         let inspectedCardForExport = null;
+
+        // Battle System States
+        let battleP1 = null;
+        let battleP2 = null;
+        let isBattling = false;
+
+        // Trade QR Camera States
+        let videoStream = null;
+        let isScanning = false;
 
         // Elements & Element Palettes
         const ELEMENTS = [
@@ -326,7 +452,6 @@
             document.getElementById('prompt-input').value = random;
         }
 
-        // String Hash algorithm for deterministic procedural pixel generation
         function stringToHash(str) {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
@@ -342,34 +467,29 @@
             return x - Math.floor(x);
         }
 
-        // Procedural Character Pixel Art Canvas Generator (Symmetrical Entity)
         function generatePixelArtCanvas(seed, elementInfo, size = 16) {
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
             const ctx = canvas.getContext('2d');
-            
             const palette = elementInfo.colors;
             let s = seed;
 
-            // Background
             ctx.fillStyle = palette.bg;
             ctx.fillRect(0, 0, size, size);
 
             const half = Math.floor(size / 2);
 
-            // Draw symmetrical entity character
             for (let y = 1; y < size - 1; y++) {
                 for (let x = 1; x <= half; x++) {
                     const r = pseudoRandom(s++);
-                    
                     const isUpper = y < 5;
                     const isMiddle = y >= 5 && y < 12;
                     
                     let drawPixel = false;
-                    if (isUpper && r > 0.45) drawPixel = true;  // Head/Horns
-                    if (isMiddle && r > 0.25) drawPixel = true; // Torso/Wings
-                    if (!isUpper && !isMiddle && r > 0.5) drawPixel = true; // Legs/Base
+                    if (isUpper && r > 0.45) drawPixel = true;  
+                    if (isMiddle && r > 0.25) drawPixel = true; 
+                    if (!isUpper && !isMiddle && r > 0.5) drawPixel = true; 
 
                     if (drawPixel) {
                         const colorR = pseudoRandom(s++);
@@ -378,15 +498,12 @@
                         if (colorR > 0.88) color = palette.accent;
 
                         ctx.fillStyle = color;
-                        // Left
                         ctx.fillRect(half - x, y, 1, 1);
-                        // Right (Symmetry)
                         ctx.fillRect(half + x - 1, y, 1, 1);
                     }
                 }
             }
 
-            // Entity Eyes
             ctx.fillStyle = palette.accent;
             ctx.fillRect(half - 1, 4, 1, 1);
             ctx.fillRect(half, 4, 1, 1);
@@ -402,11 +519,9 @@
             canvas.height = height;
             const ctx = canvas.getContext('2d');
 
-            // Card Frame Background
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, width, height);
 
-            // Rarity Border
             let borderColor = '#262626';
             if (card.rarity === 'SR') borderColor = '#3b82f6';
             if (card.rarity === 'SSR') borderColor = '#a855f7';
@@ -416,13 +531,11 @@
             ctx.lineWidth = 4;
             ctx.strokeRect(2, 2, width - 4, height - 4);
 
-            // Title
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 12px "JetBrains Mono", monospace';
             const displayTitle = card.title.length > 12 ? card.title.substring(0, 11) + '…' : card.title;
             ctx.fillText(displayTitle, 14, 26);
 
-            // Element Icon & Rarity Badge
             ctx.font = '12px "JetBrains Mono", monospace';
             ctx.fillText(card.element.icon, width - 55, 26);
             
@@ -430,7 +543,6 @@
             ctx.font = 'bold 12px "JetBrains Mono", monospace';
             ctx.fillText(card.rarity, width - 30, 26);
 
-            // Character Art Area
             const artSize = 190;
             const artX = (width - artSize) / 2;
             const artY = 40;
@@ -443,13 +555,11 @@
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(pixelArt, artX, artY, artSize, artSize);
 
-            // Stats Container Box
             ctx.fillStyle = '#171717';
             ctx.fillRect(14, 245, width - 28, 75);
             ctx.strokeStyle = '#262626';
             ctx.strokeRect(14, 245, width - 28, 75);
 
-            // Details & Stats
             ctx.fillStyle = '#a3a3a3';
             ctx.font = '10px "JetBrains Mono", monospace';
             ctx.fillText(`ID: #${card.id}`, 22, 263);
@@ -469,7 +579,6 @@
             const promptText = document.getElementById('prompt-input').value.trim() || "無題の夢";
             const hash = stringToHash(promptText);
             
-            // Assign element dynamically based on text hash
             const element = ELEMENTS[hash % ELEMENTS.length];
             const fortune = FORTUNE_PHRASES[hash % FORTUNE_PHRASES.length];
 
@@ -521,6 +630,8 @@
 
         function deleteCard(id) {
             cardCollection = cardCollection.filter(c => c.id !== id);
+            if (battleP1 && battleP1.id === id) battleP1 = null;
+            if (battleP2 && battleP2.id === id) battleP2 = null;
             saveToLocalStorage();
             updateUIState();
             showToast("🗑️ カードを削除しました");
@@ -539,16 +650,17 @@
                     cardCollection = [];
                 }
             } else {
-                // Rule: Starts with 0 initial cards
                 cardCollection = [];
             }
         }
 
         function confirmResetDB() {
-            if (confirm("本当にデータベースをリセットしますか？保存された夢カードがすべて消去されます。")) {
+            if (confirm("本当にデータベースをリセットしますか？")) {
                 localStorage.removeItem('mugen_dreams_cards');
                 cardCollection = [];
                 currentDraftCard = null;
+                battleP1 = null;
+                battleP2 = null;
                 document.getElementById('card-preview-container').innerHTML = `
                     <div class="text-center text-neutral-600 font-mono text-xs py-16">
                         [ キャラクターが未生成です ]<br>
@@ -568,6 +680,7 @@
             document.getElementById('archive-count').innerText = cardCollection.length;
             document.getElementById('stat-slots').innerText = `${Math.min(cardCollection.length, 12)} / 12`;
             document.getElementById('museum-count').innerText = cardCollection.length;
+            document.getElementById('battle-selector-count').innerText = cardCollection.length;
 
             let highest = '-';
             const rarities = ['UR', 'SSR', 'SR', 'N'];
@@ -579,6 +692,7 @@
             }
             document.getElementById('stat-rarity').innerText = highest;
 
+            // Gallery Grid
             const grid = document.getElementById('collection-grid');
             grid.innerHTML = '';
 
@@ -612,11 +726,378 @@
                 });
             }
 
+            renderBattleSelector();
+            updateBattleSlotUI();
+
             if (typeof update3DMuseumExhibits === 'function') {
                 update3DMuseumExhibits();
             }
         }
 
+        /* --- SMASH BATTLE SYSTEM --- */
+        function renderBattleSelector() {
+            const grid = document.getElementById('battle-card-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            if (cardCollection.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-8 text-center text-neutral-600 font-mono text-xs border border-dashed border-neutral-800 rounded-lg">
+                        対戦に使用可能なカードがありません。生成画面でカードを作成・保存してください。
+                    </div>
+                `;
+                return;
+            }
+
+            cardCollection.forEach(card => {
+                const cardCanvas = createCardCanvas(card);
+                cardCanvas.className = "w-full h-auto rounded border border-neutral-800 pixelated cursor-pointer hover:border-white transition-all";
+                
+                const wrapper = document.createElement('div');
+                let badgeHtml = '';
+                if (battleP1 && battleP1.id === card.id) badgeHtml = `<div class="absolute top-1 left-1 bg-red-600 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded">P1</div>`;
+                if (battleP2 && battleP2.id === card.id) badgeHtml = `<div class="absolute top-1 left-1 bg-blue-600 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded">P2</div>`;
+
+                wrapper.className = "relative cursor-pointer hover:scale-105 transition-transform";
+                wrapper.innerHTML = badgeHtml;
+                wrapper.appendChild(cardCanvas);
+
+                wrapper.onclick = () => selectCardForBattle(card);
+                grid.appendChild(wrapper);
+            });
+        }
+
+        function selectCardForBattle(card) {
+            if (isBattling) return;
+
+            if (!battleP1) {
+                battleP1 = card;
+            } else if (!battleP2 && battleP1.id !== card.id) {
+                battleP2 = card;
+            } else if (battleP1.id === card.id) {
+                battleP1 = null;
+            } else if (battleP2 && battleP2.id === card.id) {
+                battleP2 = null;
+            } else {
+                battleP2 = card;
+            }
+
+            updateBattleSlotUI();
+            renderBattleSelector();
+        }
+
+        function resetBattleSelection() {
+            if (isBattling) return;
+            battleP1 = null;
+            battleP2 = null;
+            document.getElementById('p1-percent').innerText = "0%";
+            document.getElementById('p2-percent').innerText = "0%";
+            document.getElementById('battle-status-text').innerText = "対戦カードを選択してください";
+            updateBattleSlotUI();
+            renderBattleSelector();
+        }
+
+        function updateBattleSlotUI() {
+            const p1Slot = document.getElementById('p1-card-slot');
+            const p2Slot = document.getElementById('p2-card-slot');
+            const p1Name = document.getElementById('p1-name');
+            const p2Name = document.getElementById('p2-name');
+            const startBtn = document.getElementById('start-battle-btn');
+
+            if (battleP1) {
+                p1Slot.innerHTML = '';
+                const canvas = createCardCanvas(battleP1);
+                canvas.className = "w-full h-full rounded pixelated";
+                p1Slot.appendChild(canvas);
+                p1Name.innerText = battleP1.title;
+            } else {
+                p1Slot.innerHTML = `<div class="text-center font-mono text-xs text-neutral-600">[ PLAYER 1 ]<br>カードを選択</div>`;
+                p1Name.innerText = "-";
+            }
+
+            if (battleP2) {
+                p2Slot.innerHTML = '';
+                const canvas = createCardCanvas(battleP2);
+                canvas.className = "w-full h-full rounded pixelated";
+                p2Slot.appendChild(canvas);
+                p2Name.innerText = battleP2.title;
+            } else {
+                p2Slot.innerHTML = `<div class="text-center font-mono text-xs text-neutral-600">[ PLAYER 2 ]<br>カードを選択</div>`;
+                p2Name.innerText = "-";
+            }
+
+            if (battleP1 && battleP2) {
+                startBtn.disabled = false;
+                startBtn.className = "px-8 py-3 bg-white text-black font-mono font-bold text-sm rounded transition-all hover:bg-neutral-200 shadow-xl tracking-wider uppercase cursor-pointer animate-pulse";
+                document.getElementById('battle-status-text').innerText = "READY FOR SMASH BATTLE!!";
+            } else {
+                startBtn.disabled = true;
+                startBtn.className = "px-8 py-3 bg-neutral-800 text-neutral-500 font-mono font-bold text-sm rounded transition-all tracking-wider uppercase cursor-not-allowed";
+            }
+        }
+
+        async function startSmashBattle() {
+            if (!battleP1 || !battleP2 || isBattling) return;
+            isBattling = true;
+
+            const statusText = document.getElementById('battle-status-text');
+            const stage = document.getElementById('battle-stage-container');
+            const p1Slot = document.getElementById('p1-card-slot');
+            const p2Slot = document.getElementById('p2-card-slot');
+            const p1PercentEl = document.getElementById('p1-percent');
+            const p2PercentEl = document.getElementById('p2-percent');
+
+            let p1Percent = 0;
+            let p2Percent = 0;
+            p1PercentEl.innerText = "0%";
+            p2PercentEl.innerText = "0%";
+
+            statusText.innerText = "3... 2... 1... GO!!";
+            await new Promise(r => setTimeout(r, 1000));
+
+            const p1Score = battleP1.atk + (battleP1.def * 0.5) + (Math.random() * 2000);
+            const p2Score = battleP2.atk + (battleP2.def * 0.5) + (Math.random() * 2000);
+            
+            const winner = p1Score >= p2Score ? 1 : 2;
+            const turns = 4;
+
+            for (let i = 1; i <= turns; i++) {
+                const attacker = (i % 2 === 1) ? 1 : 2;
+                statusText.innerText = `TURN ${i} / 激しい攻防！`;
+
+                if (attacker === 1) {
+                    p1Slot.classList.add('animate-attack-left');
+                    await new Promise(r => setTimeout(r, 250));
+                    
+                    stage.classList.add('animate-shake');
+                    p2Percent += Math.floor(25 + Math.random() * 35);
+                    p2PercentEl.innerText = `${p2Percent}%`;
+
+                    await new Promise(r => setTimeout(r, 250));
+                    p1Slot.classList.remove('animate-attack-left');
+                    stage.classList.remove('animate-shake');
+                } else {
+                    p2Slot.classList.add('animate-attack-right');
+                    await new Promise(r => setTimeout(r, 250));
+
+                    stage.classList.add('animate-shake');
+                    p1Percent += Math.floor(25 + Math.random() * 35);
+                    p1PercentEl.innerText = `${p1Percent}%`;
+
+                    await new Promise(r => setTimeout(r, 250));
+                    p2Slot.classList.remove('animate-attack-right');
+                    stage.classList.remove('animate-shake');
+                }
+
+                await new Promise(r => setTimeout(r, 400));
+            }
+
+            statusText.innerText = "FINISH BLOW!! スマッシュ攻撃！";
+            const impactOverlay = document.getElementById('smash-impact-effect');
+
+            if (winner === 1) {
+                p1Slot.classList.add('animate-attack-left');
+                await new Promise(r => setTimeout(r, 250));
+
+                impactOverlay.classList.remove('hidden');
+                p2Percent += 120;
+                p2PercentEl.innerText = `${p2Percent}%`;
+                p2Slot.classList.add('animate-blast-right');
+                stage.classList.add('animate-shake');
+
+                await new Promise(r => setTimeout(r, 700));
+                p1Slot.classList.remove('animate-attack-left');
+                stage.classList.remove('animate-shake');
+                statusText.innerText = `WINNER: [P1] ${battleP1.title}!!`;
+            } else {
+                p2Slot.classList.add('animate-attack-right');
+                await new Promise(r => setTimeout(r, 250));
+
+                impactOverlay.classList.remove('hidden');
+                p1Percent += 120;
+                p1PercentEl.innerText = `${p1Percent}%`;
+                p1Slot.classList.add('animate-blast-left');
+                stage.classList.add('animate-shake');
+
+                await new Promise(r => setTimeout(r, 700));
+                p2Slot.classList.remove('animate-attack-right');
+                stage.classList.remove('animate-shake');
+                statusText.innerText = `WINNER: [P2] ${battleP2.title}!!`;
+            }
+
+            await new Promise(r => setTimeout(r, 1500));
+            impactOverlay.classList.add('hidden');
+            
+            p1Slot.classList.remove('animate-blast-left');
+            p2Slot.classList.remove('animate-blast-right');
+
+            isBattling = false;
+        }
+
+        /* --- TRADE QR SYSTEM --- */
+        function openTradeModal() {
+            populateTradeSelect();
+            document.getElementById('trade-modal').classList.remove('hidden');
+            switchTradeTab('send');
+        }
+
+        function closeTradeModal() {
+            stopCamera();
+            document.getElementById('trade-modal').classList.add('hidden');
+        }
+
+        function switchTradeTab(tab) {
+            const sendSection = document.getElementById('trade-send-section');
+            const receiveSection = document.getElementById('trade-receive-section');
+            const sendBtn = document.getElementById('trade-tab-send-btn');
+            const receiveBtn = document.getElementById('trade-tab-receive-btn');
+
+            if (tab === 'send') {
+                stopCamera();
+                sendSection.classList.remove('hidden');
+                receiveSection.classList.add('hidden');
+                sendBtn.className = "flex-1 py-2 bg-white text-black font-bold rounded";
+                receiveBtn.className = "flex-1 py-2 bg-neutral-800 text-neutral-400 rounded";
+                generateTradeQRCode();
+            } else {
+                sendSection.classList.add('hidden');
+                receiveSection.classList.remove('hidden');
+                sendBtn.className = "flex-1 py-2 bg-neutral-800 text-neutral-400 rounded";
+                receiveBtn.className = "flex-1 py-2 bg-white text-black font-bold rounded";
+                startCameraScan();
+            }
+        }
+
+        function populateTradeSelect() {
+            const select = document.getElementById('trade-card-select');
+            select.innerHTML = '';
+            if (cardCollection.length === 0) {
+                select.innerHTML = '<option value="">カードを持っていません</option>';
+                return;
+            }
+            cardCollection.forEach(card => {
+                const opt = document.createElement('option');
+                opt.value = card.id;
+                opt.innerText = `[${card.rarity}] ${card.title} (ATK:${card.atk})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function generateTradeQRCode() {
+            const select = document.getElementById('trade-card-select');
+            const container = document.getElementById('qrcode-container');
+            container.innerHTML = '';
+
+            const cardId = parseInt(select.value);
+            const card = cardCollection.find(c => c.id === cardId);
+            if (!card) return;
+
+            const payload = JSON.stringify({
+                id: card.id,
+                title: card.title,
+                elementIndex: ELEMENTS.findIndex(e => e.name === card.element.name),
+                rarity: card.rarity,
+                seed: card.seed,
+                fortune: card.fortune,
+                atk: card.atk,
+                def: card.def
+            });
+
+            new QRCode(container, {
+                text: payload,
+                width: 150,
+                height: 150,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.L
+            });
+        }
+
+        async function startCameraScan() {
+            const video = document.getElementById('trade-camera-stream');
+            const status = document.getElementById('trade-scan-status');
+            status.innerText = "カメラへのアクセスを許可してください...";
+
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = videoStream;
+                video.setAttribute("playsinline", true);
+                video.play();
+                isScanning = true;
+                requestAnimationFrame(scanQRCodeTick);
+                status.innerText = "QRコードを枠内にかざしてください";
+            } catch (err) {
+                status.innerText = "⚠️ カメラの起動に失敗しました";
+            }
+        }
+
+        function scanQRCodeTick() {
+            if (!isScanning) return;
+
+            const video = document.getElementById('trade-camera-stream');
+            const canvas = document.getElementById('trade-camera-canvas');
+            const ctx = canvas.getContext('2d');
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                if (code) {
+                    try {
+                        const data = JSON.parse(code.data);
+                        if (data.id && data.title && data.seed) {
+                            receiveCardData(data);
+                            return;
+                        }
+                    } catch (e) {}
+                }
+            }
+            requestAnimationFrame(scanQRCodeTick);
+        }
+
+        function receiveCardData(data) {
+            isScanning = false;
+            stopCamera();
+
+            const newCard = {
+                id: data.id,
+                title: data.title,
+                element: ELEMENTS[data.elementIndex] || ELEMENTS[0],
+                rarity: data.rarity,
+                seed: data.seed,
+                fortune: data.fortune,
+                atk: data.atk,
+                def: data.def,
+                timestamp: Date.now()
+            };
+
+            if (!cardCollection.some(c => c.id === newCard.id)) {
+                cardCollection.unshift(newCard);
+                saveToLocalStorage();
+                updateUIState();
+                showToast(`🎉 「${newCard.title}」を受信しました！`);
+            } else {
+                showToast("⚠️ すでに所持しているカードです");
+            }
+
+            closeTradeModal();
+        }
+
+        function stopCamera() {
+            isScanning = false;
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+        }
+
+        /* --- MODAL & TOAST --- */
         function openModal(card) {
             inspectedCardForExport = card;
             const modal = document.getElementById('detail-modal');
@@ -663,6 +1144,7 @@
             }, 2500);
         }
 
+        /* --- 3D MUSEUM SYSTEM --- */
         let scene, camera, renderer;
         let avatarGroup, leftLeg, rightLeg, leftArm, rightArm;
         let exhibits = [];
@@ -739,17 +1221,14 @@
             const matBody = new THREE.MeshStandardMaterial({ color: 0x262626 });
             const matSkin = new THREE.MeshStandardMaterial({ color: 0xe0ac69 });
 
-            // Head
             const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), matSkin);
             head.position.y = 1.6;
             avatarGroup.add(head);
 
-            // Torso
             const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.7, 16), matBody);
             torso.position.y = 1.05;
             avatarGroup.add(torso);
 
-            // Arms
             leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6), matSkin);
             leftArm.position.set(-0.3, 1.1, 0);
             avatarGroup.add(leftArm);
@@ -758,7 +1237,6 @@
             rightArm.position.set(0.3, 1.1, 0);
             avatarGroup.add(rightArm);
 
-            // Legs
             leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.7), matBody);
             leftLeg.position.set(-0.12, 0.35, 0);
             avatarGroup.add(leftLeg);
@@ -772,6 +1250,7 @@
         }
 
         function update3DMuseumExhibits() {
+            if (!scene) return;
             exhibits.forEach(ex => scene.remove(ex.mesh));
             exhibits = [];
 
@@ -938,26 +1417,40 @@
         function switchTab(tab) {
             currentTab = tab;
             const genTab = document.getElementById('tab-generator');
+            const battleTab = document.getElementById('tab-battle');
             const museumTab = document.getElementById('tab-museum');
+
             const genBtn = document.getElementById('nav-gen-btn');
+            const battleBtn = document.getElementById('nav-battle-btn');
             const museumBtn = document.getElementById('nav-museum-btn');
+
+            genTab.classList.add('hidden');
+            genTab.classList.remove('flex');
+            battleTab.classList.add('hidden');
+            battleTab.classList.remove('flex');
+            museumTab.classList.add('hidden');
+            museumTab.classList.remove('flex');
+
+            const inactiveClass = "px-2.5 sm:px-3 py-1.5 text-xs font-mono text-neutral-400 hover:text-white rounded transition-all";
+            const activeClass = "px-2.5 sm:px-3 py-1.5 text-xs font-mono rounded transition-all bg-white text-black font-semibold shadow-sm";
+            
+            genBtn.className = inactiveClass;
+            battleBtn.className = inactiveClass;
+            museumBtn.className = inactiveClass;
 
             if (tab === 'generator') {
                 genTab.classList.remove('hidden');
                 genTab.classList.add('flex');
-                museumTab.classList.add('hidden');
-                museumTab.classList.remove('flex');
-
-                genBtn.className = "px-3 py-1.5 text-xs font-mono rounded transition-all bg-white text-black font-semibold shadow-sm";
-                museumBtn.className = "px-3 py-1.5 text-xs font-mono text-neutral-400 hover:text-white rounded transition-all";
-            } else {
+                genBtn.className = activeClass;
+            } else if (tab === 'battle') {
+                battleTab.classList.remove('hidden');
+                battleTab.classList.add('flex');
+                battleBtn.className = activeClass;
+                renderBattleSelector();
+            } else if (tab === 'museum') {
                 museumTab.classList.remove('hidden');
                 museumTab.classList.add('flex');
-                genTab.classList.add('hidden');
-                genTab.classList.remove('flex');
-
-                museumBtn.className = "px-3 py-1.5 text-xs font-mono rounded transition-all bg-white text-black font-semibold shadow-sm";
-                genBtn.className = "px-3 py-1.5 text-xs font-mono text-neutral-400 hover:text-white rounded transition-all";
+                museumBtn.className = activeClass;
 
                 if (!scene) {
                     init3DMuseum();
